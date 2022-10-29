@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from genotypes import PRIMITIVES, STEPS, CONCAT, Genotype
-from torch.autograd import Variable
-from collections import namedtuple
 from model import DARTSCell, RNNModel
 
 
@@ -53,13 +51,14 @@ class RNNModelSearch(RNNModel):
     def new(self):
         model_new = RNNModelSearch(*self._args)
         for x, y in zip(model_new.arch_parameters(), self.arch_parameters()):
-            x.data.copy_(y.data)
+            x.copy_(y)
         return model_new
 
     def _initialize_arch_parameters(self):
       k = sum(i for i in range(1, STEPS+1))
       weights_data = torch.randn(k, len(PRIMITIVES)).mul_(1e-3)
-      self.weights = Variable(weights_data.cuda(), requires_grad=True)
+      # self.weights = Variable(weights_data.cuda(), requires_grad=True)
+      self.weights = torch.tensor(weights_data, requires_grad=True).cuda()
       self._arch_parameters = [self.weights]
       for rnn in self.rnns:
         rnn.weights = self.weights
@@ -90,7 +89,6 @@ class RNNModelSearch(RNNModel):
           start = end
         return gene
 
-      gene = _parse(F.softmax(self.weights, dim=-1).data.cpu().numpy())
+      gene = _parse(F.softmax(self.weights, dim=-1).cpu().numpy())
       genotype = Genotype(recurrent=gene, concat=range(STEPS+1)[-CONCAT:])
       return genotype
-

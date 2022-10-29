@@ -2,12 +2,11 @@ import torch
 import torch.nn as nn
 import os, shutil
 import numpy as np
-from torch.autograd import Variable
 
 
 def repackage_hidden(h):
-    if type(h) == Variable:
-        return Variable(h.data)
+    if type(h) == torch.Tensor:
+        return h
     else:
         return tuple(repackage_hidden(v) for v in h)
 
@@ -24,8 +23,8 @@ def batchify(data, bsz, args):
 
 def get_batch(source, i, args, seq_len=None, evaluation=False):
     seq_len = min(seq_len if seq_len else args.bptt, len(source) - 1 - i)
-    data = Variable(source[i:i+seq_len], volatile=evaluation)
-    target = Variable(source[i+1:i+1+seq_len])
+    data = source[i:i+seq_len]
+    target = source[i+1:i+1+seq_len]
     return data, target
 
 
@@ -53,8 +52,7 @@ def save_checkpoint(model, optimizer, epoch, path, finetune=False):
 
 def embedded_dropout(embed, words, dropout=0.1, scale=None):
     if dropout:
-        mask = embed.weight.data.new().resize_((embed.weight.size(0), 1)).bernoulli_(1 - dropout).expand_as(embed.weight) / (1 - dropout)
-        mask = Variable(mask)
+        mask = embed.weight.new().resize_((embed.weight.size(0), 1)).bernoulli_(1 - dropout).expand_as(embed.weight) / (1 - dropout)
         masked_embed_weight = mask * embed.weight
     else:
         masked_embed_weight = embed.weight
@@ -78,16 +76,14 @@ class LockedDropout(nn.Module):
     def forward(self, x, dropout=0.5):
         if not self.training or not dropout:
             return x
-        m = x.data.new(1, x.size(1), x.size(2)).bernoulli_(1 - dropout)
-        mask = Variable(m.div_(1 - dropout), requires_grad=False)
+        m = x.new(1, x.size(1), x.size(2)).bernoulli_(1 - dropout)
+        mask = m.div_(1 - dropout)
         mask = mask.expand_as(x)
         return mask * x
 
 
 def mask2d(B, D, keep_prob, cuda=True):
     m = torch.floor(torch.rand(B, D) + keep_prob) / keep_prob
-    m = Variable(m, requires_grad=False)
     if cuda:
         m = m.cuda()
     return m
-

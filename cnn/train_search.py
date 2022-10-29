@@ -9,9 +9,8 @@ import logging
 import argparse
 import torch.nn as nn
 import torch.utils
-import torch.nn.functional as F
 import torchvision.datasets as dset
-import torch.backends.cudnn as cudnn
+from torch.utils.data.sampler import SubsetRandomSampler
 
 from model_search import Network
 from architect import Architect
@@ -61,9 +60,7 @@ CIFAR_CLASSES = 10
 
 def main():
   np.random.seed(args.seed)
-  cudnn.benchmark = True
   torch.manual_seed(args.seed)
-  cudnn.enabled=True
   logging.info('gpu device = %d' % args.gpu)
   logging.info("args = %s", args)
 
@@ -79,7 +76,7 @@ def main():
       momentum=args.momentum,
       weight_decay=args.weight_decay)
 
-  train_transform, valid_transform = utils._data_transforms_cifar10(args)
+  train_transform, _ = utils._data_transforms_cifar10(args)
   train_data = dset.CIFAR10(root=args.data, train=True, download=True, transform=train_transform)
 
   num_train = len(train_data)
@@ -88,7 +85,7 @@ def main():
 
   train_queue = torch.utils.data.DataLoader(
       train_data, batch_size=args.batch_size,
-      sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
+      sampler=SubsetRandomSampler(indices[:split]),
       pin_memory=True, num_workers=2)
 
   valid_queue = torch.utils.data.DataLoader(
@@ -102,22 +99,21 @@ def main():
   architect = Architect(model, args)
 
   for epoch in range(args.epochs):
-    scheduler.step()
-    lr = scheduler.get_lr()[0]
+    lr = scheduler.get_last_lr()[-1]
     logging.info('epoch %d lr %e', epoch, lr)
 
     genotype = model.genotype()
     logging.info('genotype = %s', genotype)
 
-    print(F.softmax(model.alphas_normal, dim=-1))
-    print(F.softmax(model.alphas_reduce, dim=-1))
+    # print(F.softmax(model.alphas_normal, dim=-1))
+    # print(F.softmax(model.alphas_reduce, dim=-1))
 
     # training
-    train_acc, train_obj = train(train_queue, valid_queue, model, architect, criterion, optimizer, lr)
+    train_acc, _ = train(train_queue, valid_queue, model, architect, criterion, optimizer, lr)
     logging.info('train_acc %f', train_acc)
 
     # validation
-    valid_acc, valid_obj = infer(valid_queue, model, criterion)
+    valid_acc, _ = infer(valid_queue, model, criterion)
     logging.info('valid_acc %f', valid_acc)
 
     utils.save(model, os.path.join(args.save, 'weights.pt'))
@@ -129,6 +125,7 @@ def train(train_queue, valid_queue, model, architect, criterion, optimizer, lr):
   top5 = utils.AvgrageMeter()
 
   for step, (input, target) in enumerate(train_queue):
+    print(f'step = {step}/{len(train_queue)}')
     model.train()
 
     n = input.size(0)
@@ -171,9 +168,9 @@ def infer(valid_queue, model, criterion):
 
     prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
     n = input.size(0)
-    objs.update(loss.data[0], n)
-    top1.update(prec1.data[0], n)
-    top5.update(prec5.data[0], n)
+    objs.update(loss.item(), n)
+    top1.update(prec1.item(), n)
+    top5.update(prec5.item(), n)
 
     if step % args.report_freq == 0:
       logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)

@@ -1,4 +1,3 @@
-import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,7 +5,6 @@ from genotypes import STEPS
 from utils import mask2d
 from utils import LockedDropout
 from utils import embedded_dropout
-from torch.autograd import Variable
 
 INITRANGE = 0.04
 
@@ -121,9 +119,9 @@ class RNNModel(nn.Module):
         self.cell_cls = cell_cls
 
     def init_weights(self):
-        self.encoder.weight.data.uniform_(-INITRANGE, INITRANGE)
-        self.decoder.bias.data.fill_(0)
-        self.decoder.weight.data.uniform_(-INITRANGE, INITRANGE)
+        self.encoder.weight.uniform_(-INITRANGE, INITRANGE)
+        self.decoder.bias.fill_(0)
+        self.decoder.weight.uniform_(-INITRANGE, INITRANGE)
 
     def forward(self, input, hidden, return_h=False):
         batch_size = input.size(1)
@@ -136,7 +134,6 @@ class RNNModel(nn.Module):
         raw_outputs = []
         outputs = []
         for l, rnn in enumerate(self.rnns):
-            current_input = raw_output
             raw_output, new_h = rnn(raw_output, hidden[l])
             new_hidden.append(new_h)
             raw_outputs.append(raw_output)
@@ -155,6 +152,5 @@ class RNNModel(nn.Module):
         return model_output, hidden
 
     def init_hidden(self, bsz):
-      weight = next(self.parameters()).data
-      return [Variable(weight.new(1, bsz, self.nhid).zero_())]
-
+      weight = next(self.parameters())
+      return [weight.new(1, bsz, self.nhid).zero_()]

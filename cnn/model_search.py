@@ -99,7 +99,8 @@ class Network(nn.Module):
   def new(self):
     model_new = Network(self._C, self._num_classes, self._layers, self._criterion).to(device)
     for x, y in zip(model_new.arch_parameters(), self.arch_parameters()):
-        x.data.copy_(y.data)
+      with torch.no_grad():
+        x.copy_(y)
     return model_new
 
   def forward(self, input):
@@ -157,8 +158,8 @@ class Network(nn.Module):
         n += 1
       return gene
 
-    gene_normal = _parse(F.softmax(self.alphas_normal, dim=-1).data.cpu().numpy())
-    gene_reduce = _parse(F.softmax(self.alphas_reduce, dim=-1).data.cpu().numpy())
+    gene_normal = _parse(F.softmax(self.alphas_normal, dim=-1).detach().cpu().numpy())
+    gene_reduce = _parse(F.softmax(self.alphas_reduce, dim=-1).detach().cpu().numpy())
 
     concat = range(2+self._steps-self._multiplier, self._steps+2)
     genotype = Genotype(

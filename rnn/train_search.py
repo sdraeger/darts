@@ -142,7 +142,7 @@ else:
     parallel_model = model
 architect = Architect(parallel_model, args)
 
-total_params = sum(x.data.nelement() for x in model.parameters())
+total_params = sum(x.numel() for x in model.parameters())
 logging.info('Args: {}'.format(args))
 logging.info('Model total parameters: {}'.format(total_params))
 
@@ -158,7 +158,7 @@ def evaluate(data_source, batch_size=10):
         targets = targets.view(-1)
 
         log_prob, hidden = parallel_model(data, hidden)
-        loss = nn.functional.nll_loss(log_prob.view(-1, log_prob.size(2)), targets).data
+        loss = nn.functional.nll_loss(log_prob.view(-1, log_prob.size(2)), targets)
 
         total_loss += loss * len(data)
 
@@ -223,7 +223,7 @@ def train():
             # Temporal Activation Regularization (slowness)
             loss = loss + sum(args.beta * (rnn_h[1:] - rnn_h[:-1]).pow(2).mean() for rnn_h in rnn_hs[-1:])
             loss *= args.small_batch_size / args.batch_size
-            total_loss += raw_loss.data * args.small_batch_size / args.batch_size
+            total_loss += raw_loss * args.small_batch_size / args.batch_size
             loss.backward()
 
             s_id += 1
@@ -236,7 +236,7 @@ def train():
         torch.nn.utils.clip_grad_norm(model.parameters(), args.clip)
         optimizer.step()
 
-        # total_loss += raw_loss.data
+        # total_loss += raw_loss
         optimizer.param_groups[0]['lr'] = lr2
         if batch % args.log_interval == 0 and batch > 0:
             logging.info(parallel_model.genotype())

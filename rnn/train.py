@@ -9,13 +9,10 @@ import torch
 import torch.nn as nn
 import logging
 import argparse
-import genotypes
-import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 import data
 import model
 
-from torch.autograd import Variable
 from utils import batchify, get_batch, repackage_hidden, create_exp_dir, save_checkpoint
 
 parser = argparse.ArgumentParser(description='PyTorch PennTreeBank/WikiText2 Language Model')
@@ -131,7 +128,7 @@ if args.cuda:
 else:
     parallel_model = model
 
-total_params = sum(x.data.nelement() for x in model.parameters())
+total_params = sum(x.numel() for x in model.parameters())
 logging.info('Args: {}'.format(args))
 logging.info('Model total parameters: {}'.format(total_params))
 logging.info('Genotype: {}'.format(genotype))
@@ -148,7 +145,7 @@ def evaluate(data_source, batch_size=10):
         targets = targets.view(-1)
 
         log_prob, hidden = parallel_model(data, hidden)
-        loss = nn.functional.nll_loss(log_prob.view(-1, log_prob.size(2)), targets).data
+        loss = nn.functional.nll_loss(log_prob.view(-1, log_prob.size(2)), targets)
 
         total_loss += loss * len(data)
 
@@ -197,7 +194,7 @@ def train():
             # Temporal Activation Regularization (slowness)
             loss = loss + sum(args.beta * (rnn_h[1:] - rnn_h[:-1]).pow(2).mean() for rnn_h in rnn_hs[-1:])
             loss *= args.small_batch_size / args.batch_size
-            total_loss += raw_loss.data * args.small_batch_size / args.batch_size
+            total_loss += raw_loss * args.small_batch_size / args.batch_size
             loss.backward()
 
             s_id += 1
@@ -210,7 +207,7 @@ def train():
         torch.nn.utils.clip_grad_norm(model.parameters(), args.clip)
         optimizer.step()
 
-        # total_loss += raw_loss.data
+        # total_loss += raw_loss
         optimizer.param_groups[0]['lr'] = lr2
 
         if np.isnan(total_loss[0]):
@@ -268,8 +265,8 @@ try:
         if 't0' in optimizer.param_groups[0]:
             tmp = {}
             for prm in model.parameters():
-                tmp[prm] = prm.data.clone()
-                prm.data = optimizer.state[prm]['ax'].clone()
+                tmp[prm] = prm.clone()
+                prm = optimizer.state[prm]['ax'].clone()
 
             val_loss2 = evaluate(val_data)
             logging.info('-' * 89)
@@ -284,7 +281,7 @@ try:
                 stored_loss = val_loss2
 
             for prm in model.parameters():
-                prm.data = tmp[prm].clone()
+                prm = tmp[prm].clone()
 
         else:
             val_loss = evaluate(val_data, eval_batch_size)

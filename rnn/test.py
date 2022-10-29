@@ -1,6 +1,4 @@
 import argparse
-import os, sys
-import time
 import math
 import numpy as np
 import torch
@@ -10,7 +8,7 @@ import torch.backends.cudnn as cudnn
 import data
 import model
 
-from utils import batchify, get_batch, repackage_hidden, create_exp_dir, save_checkpoint
+from utils import batchify, get_batch, repackage_hidden
 
 parser = argparse.ArgumentParser(description='PyTorch PennTreeBank/WikiText2 Language Model')
 parser.add_argument('--data', type=str, default='../data/penn/',
@@ -97,7 +95,7 @@ def evaluate(data_source, batch_size=10):
         targets = targets.view(-1)
 
         log_prob, hidden = parallel_model(data, hidden)
-        loss = nn.functional.nll_loss(log_prob.view(-1, log_prob.size(2)), targets).data
+        loss = nn.functional.nll_loss(log_prob.view(-1, log_prob.size(2)), targets)
 
         total_loss += loss * len(data)
 
@@ -107,7 +105,7 @@ def evaluate(data_source, batch_size=10):
 # Load the best saved model.
 model = torch.load(args.model_path)
 
-total_params = sum(x.data.nelement() for x in model.parameters())
+total_params = sum(x.numel() for x in model.parameters())
 logging('Args: {}'.format(args))
 logging('Model total parameters: {}'.format(total_params))
 parallel_model = model.cuda()
