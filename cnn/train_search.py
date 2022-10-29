@@ -5,7 +5,6 @@ import glob
 import numpy as np
 import torch
 import utils
-import logging
 import argparse
 import torch.nn as nn
 import torch.utils
@@ -69,40 +68,25 @@ parser.add_argument(
     default=1e-3,
     help="weight decay for arch encoding",
 )
-parser.add_argument("--mps", action="store_true", default=False)
+parser.add_argument("--device", type=str, default='mps')
 args = parser.parse_args()
 
-device = torch.device("mps" if args.mps else "cpu")
-
-args.save = "search-{}-{}".format(args.save, time.strftime("%Y%m%d-%H%M%S"))
-utils.create_exp_dir(args.save, scripts_to_save=glob.glob("*.py"))
-
-log_format = "%(asctime)s %(message)s"
-logging.basicConfig(
-    stream=sys.stdout,
-    level=logging.INFO,
-    format=log_format,
-    datefmt="%m/%d %I:%M:%S %p",
-)
-fh = logging.FileHandler(os.path.join(args.save, "log.txt"))
-fh.setFormatter(logging.Formatter(log_format))
-logging.getLogger().addHandler(fh)
-
-
+device = torch.device(args.device)
 CIFAR_CLASSES = 10
 
 
 def main():
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    logging.info("gpu device = %d" % args.gpu)
-    logging.info("args = %s", args)
+
+    print(f'args = {args}')
 
     criterion = nn.CrossEntropyLoss()
     criterion = criterion.to(device)
     model = Network(args.init_channels, CIFAR_CLASSES, args.layers, criterion)
     model = model.to(device)
-    logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
+
+    print(f'param size in MB = {utils.count_parameters_in_MB(model)}')
 
     optimizer = torch.optim.SGD(
         model.parameters(),
@@ -143,10 +127,10 @@ def main():
 
     for epoch in range(args.epochs):
         lr = scheduler.get_last_lr()[-1]
-        logging.info("epoch %d lr %e", epoch, lr)
+        print(f'epoch = {epoch}, lr = {lr}')
 
         genotype = model.genotype()
-        logging.info("genotype = %s", genotype)
+        print(f'genotype = {genotype}')
 
         # print(F.softmax(model.alphas_normal, dim=-1))
         # print(F.softmax(model.alphas_reduce, dim=-1))
@@ -155,11 +139,11 @@ def main():
         train_acc, _ = train(
             train_queue, valid_queue, model, architect, criterion, optimizer, lr
         )
-        logging.info("train_acc %f", train_acc)
+        print(f'train_acc = {train_acc}')
 
         # validation
         valid_acc, _ = infer(valid_queue, model, criterion)
-        logging.info("valid_acc %f", valid_acc)
+        print(f'valid_acc = {valid_acc}')
 
         utils.save(model, os.path.join(args.save, "weights.pt"))
 
@@ -204,7 +188,7 @@ def train(train_queue, valid_queue, model, architect, criterion, optimizer, lr):
         top5.update(prec5.item(), n)
 
         if step % args.report_freq == 0:
-            logging.info("train %03d %e %f %f", step, objs.avg, top1.avg, top5.avg)
+            print(f'train {step} {objs.avg} {top1.avg} {top5.avg}')
 
     return top1.avg, objs.avg
 
@@ -226,7 +210,7 @@ def infer(valid_queue, model, criterion):
         top5.update(prec5.item(), n)
 
         if step % args.report_freq == 0:
-            logging.info("valid %03d %e %f %f", step, objs.avg, top1.avg, top5.avg)
+            print(f'valid {step} {objs.avg} {top1.avg} {top5.avg}')
 
     return top1.avg, objs.avg
 
