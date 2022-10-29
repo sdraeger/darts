@@ -38,6 +38,7 @@ parser.add_argument("--seed", type=int, default=0, help="random seed")
 parser.add_argument(
     "--arch", type=str, default="DARTS", help="which architecture to use"
 )
+parser.add_argument('--device', type=str, default='mps')
 args = parser.parse_args()
 
 log_format = "%(asctime)s %(message)s"
@@ -49,31 +50,25 @@ logging.basicConfig(
 )
 
 CLASSES = 1000
+device = torch.device(args.device)
 
 
 def main():
-    if not torch.cuda.is_available():
-        logging.info("no gpu device available")
-        sys.exit(1)
-
     np.random.seed(args.seed)
-    torch.cuda.set_device(args.gpu)
-    cudnn.benchmark = True
     torch.manual_seed(args.seed)
-    cudnn.enabled = True
-    torch.cuda.manual_seed(args.seed)
     logging.info("gpu device = %d" % args.gpu)
     logging.info("args = %s", args)
 
     genotype = eval("genotypes.%s" % args.arch)
     model = Network(args.init_channels, CLASSES, args.layers, args.auxiliary, genotype)
-    model = model.cuda()
+    model.to(device)
+
     model.load_state_dict(torch.load(args.model_path)["state_dict"])
 
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
 
     criterion = nn.CrossEntropyLoss()
-    criterion = criterion.cuda()
+    criterion.to(device)
 
     validdir = os.path.join(args.data, "val")
     normalize = transforms.Normalize(
@@ -112,8 +107,7 @@ def infer(valid_queue, model, criterion):
     model.eval()
 
     for step, (input, target) in enumerate(valid_queue):
-        input = input.cuda()
-        target = target.cuda()
+        input, target = input.to(device), target.to(device)
 
         logits, _ = model(input)
         loss = criterion(logits, target)

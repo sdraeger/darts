@@ -11,6 +11,7 @@ import torch.nn as nn
 import torch.utils
 import torchvision.datasets as dset
 from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data import DataLoader
 
 from model_search import Network
 from architect import Architect
@@ -119,18 +120,17 @@ def main():
     indices = list(range(num_train))
     split = int(np.floor(args.train_portion * num_train))
 
-    train_queue = torch.utils.data.DataLoader(
+    train_queue = DataLoader(
         train_data,
         batch_size=args.batch_size,
         sampler=SubsetRandomSampler(indices[:split]),
         pin_memory=True,
         num_workers=2,
     )
-
-    valid_queue = torch.utils.data.DataLoader(
+    valid_queue = DataLoader(
         train_data,
         batch_size=args.batch_size,
-        sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:num_train]),
+        sampler=SubsetRandomSampler(indices[split:num_train]),
         pin_memory=True,
         num_workers=2,
     )

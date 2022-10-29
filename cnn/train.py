@@ -8,10 +8,8 @@ import utils
 import logging
 import argparse
 import torch.nn as nn
-import genotypes
 import torch.utils
 import torchvision.datasets as dset
-import torch.backends.cudnn as cudnn
 
 from model import NetworkCIFAR as Network
 
@@ -53,6 +51,7 @@ parser.add_argument(
     "--arch", type=str, default="DARTS", help="which architecture to use"
 )
 parser.add_argument("--grad_clip", type=float, default=5, help="gradient clipping")
+parser.add_argument('--device', type=str, default='mps')
 args = parser.parse_args()
 
 args.save = "eval-{}-{}".format(args.save, time.strftime("%Y%m%d-%H%M%S"))
@@ -70,19 +69,12 @@ fh.setFormatter(logging.Formatter(log_format))
 logging.getLogger().addHandler(fh)
 
 CIFAR_CLASSES = 10
+device = torch.device(args.device)
 
 
 def main():
-    if not torch.cuda.is_available():
-        logging.info("no gpu device available")
-        sys.exit(1)
-
     np.random.seed(args.seed)
-    torch.cuda.set_device(args.gpu)
-    cudnn.benchmark = True
     torch.manual_seed(args.seed)
-    cudnn.enabled = True
-    torch.cuda.manual_seed(args.seed)
     logging.info("gpu device = %d" % args.gpu)
     logging.info("args = %s", args)
 
@@ -90,12 +82,13 @@ def main():
     model = Network(
         args.init_channels, CIFAR_CLASSES, args.layers, args.auxiliary, genotype
     )
-    model = model.cuda()
+    model.to(device)
 
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
 
     criterion = nn.CrossEntropyLoss()
-    criterion = criterion.cuda()
+    criterion.to(device)
+
     optimizer = torch.optim.SGD(
         model.parameters(),
         args.learning_rate,
@@ -118,7 +111,6 @@ def main():
         pin_memory=True,
         num_workers=2,
     )
-
     valid_queue = torch.utils.data.DataLoader(
         valid_data,
         batch_size=args.batch_size,
@@ -136,10 +128,10 @@ def main():
         logging.info("epoch %d lr %e", epoch, scheduler.get_lr()[0])
         model.drop_path_prob = args.drop_path_prob * epoch / args.epochs
 
-        train_acc, train_obj = train(train_queue, model, criterion, optimizer)
+        train_acc, _ = train(train_queue, model, criterion, optimizer)
         logging.info("train_acc %f", train_acc)
 
-        valid_acc, valid_obj = infer(valid_queue, model, criterion)
+        valid_acc, _ = infer(valid_queue, model, criterion)
         logging.info("valid_acc %f", valid_acc)
 
         utils.save(model, os.path.join(args.save, "weights.pt"))
@@ -152,15 +144,16 @@ def train(train_queue, model, criterion, optimizer):
     model.train()
 
     for step, (input, target) in enumerate(train_queue):
-        input = input.cuda()
-        target = target.cuda()
+        input, target = input.to(device), target.to(device)
 
         optimizer.zero_grad()
         logits, logits_aux = model(input)
         loss = criterion(logits, target)
+
         if args.auxiliary:
             loss_aux = criterion(logits_aux, target)
             loss += args.auxiliary_weight * loss_aux
+        
         loss.backward()
         nn.utils.clip_grad_norm(model.parameters(), args.grad_clip)
         optimizer.step()
@@ -184,8 +177,7 @@ def infer(valid_queue, model, criterion):
     model.eval()
 
     for step, (input, target) in enumerate(valid_queue):
-        input = input.cuda()
-        target = target.cuda()
+        input, target = input.to(device), target.to(device)
 
         logits, _ = model(input)
         loss = criterion(logits, target)

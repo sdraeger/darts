@@ -170,13 +170,17 @@ class Network(nn.Module):
                         if k != PRIMITIVES.index("none")
                     ),
                 )[:2]
+
                 for j in edges:
                     k_best = None
+
                     for k in range(len(W[j])):
                         if k != PRIMITIVES.index("none"):
                             if k_best is None or W[j][k] > W[j][k_best]:
                                 k_best = k
+                    
                     gene.append((PRIMITIVES[k_best], j))
+                
                 start = end
                 n += 1
             return gene
@@ -195,4 +199,5 @@ class Network(nn.Module):
             reduce=gene_reduce,
             reduce_concat=concat,
         )
+        
         return genotype

@@ -5,15 +5,12 @@ import time
 import torch
 import utils
 import glob
-import random
 import logging
 import argparse
 import torch.nn as nn
-import genotypes
 import torch.utils
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
-import torch.backends.cudnn as cudnn
 
 from model import NetworkImageNet as Network
 
@@ -61,6 +58,7 @@ parser.add_argument(
 parser.add_argument(
     "--parallel", action="store_true", default=False, help="data parallelism"
 )
+parser.add_argument('--device', type=str, default='mps')
 args = parser.parse_args()
 
 args.save = "eval-{}-{}".format(args.save, time.strftime("%Y%m%d-%H%M%S"))
@@ -78,6 +76,7 @@ fh.setFormatter(logging.Formatter(log_format))
 logging.getLogger().addHandler(fh)
 
 CLASSES = 1000
+device = torch.device(args.device)
 
 
 class CrossEntropyLabelSmooth(nn.Module):
@@ -96,32 +95,26 @@ class CrossEntropyLabelSmooth(nn.Module):
 
 
 def main():
-    if not torch.cuda.is_available():
-        logging.info("no gpu device available")
-        sys.exit(1)
-
     np.random.seed(args.seed)
-    torch.cuda.set_device(args.gpu)
-    cudnn.benchmark = True
     torch.manual_seed(args.seed)
-    cudnn.enabled = True
-    torch.cuda.manual_seed(args.seed)
     logging.info("gpu device = %d" % args.gpu)
     logging.info("args = %s", args)
 
     genotype = eval("genotypes.%s" % args.arch)
     model = Network(args.init_channels, CLASSES, args.layers, args.auxiliary, genotype)
+
     if args.parallel:
-        model = nn.DataParallel(model).cuda()
-    else:
-        model = model.cuda()
+        model = nn.DataParallel(model)
+
+    model.to(device)
 
     logging.info("param size = %fMB", utils.count_parameters_in_MB(model))
 
     criterion = nn.CrossEntropyLoss()
-    criterion = criterion.cuda()
+    criterion.to(device)
+
     criterion_smooth = CrossEntropyLabelSmooth(CLASSES, args.label_smooth)
-    criterion_smooth = criterion_smooth.cuda()
+    criterion_smooth.to(device)
 
     optimizer = torch.optim.SGD(
         model.parameters(),
@@ -218,8 +211,7 @@ def train(train_queue, model, criterion, optimizer):
     model.train()
 
     for step, (input, target) in enumerate(train_queue):
-        input = input.cuda()
-        target = target.cuda()
+        input, target = input.to(device), target.to(device)
 
         optimizer.zero_grad()
         logits, logits_aux = model(input)
@@ -252,8 +244,7 @@ def infer(valid_queue, model, criterion):
     model.eval()
 
     for step, (input, target) in enumerate(valid_queue):
-        input = input.cuda()
-        target = target.cuda()
+        input, target = input.to(device), target.to(device)
 
         logits, _ = model(input)
         loss = criterion(logits, target)

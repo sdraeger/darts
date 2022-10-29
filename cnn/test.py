@@ -38,10 +38,10 @@ parser.add_argument("--seed", type=int, default=0, help="random seed")
 parser.add_argument(
     "--arch", type=str, default="DARTS", help="which architecture to use"
 )
-parser.add_argument("--mps", action="store_true", default=False)
+parser.add_argument("--device", type=str, default='mps')
 args = parser.parse_args()
 
-device = torch.device("mps" if args.mps else "cpu")
+device = torch.device(args.device)
 
 log_format = "%(asctime)s %(message)s"
 logging.basicConfig(

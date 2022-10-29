@@ -23,8 +23,8 @@ def batchify(data, bsz, args):
 
 def get_batch(source, i, args, seq_len=None, evaluation=False):
     seq_len = min(seq_len if seq_len else args.bptt, len(source) - 1 - i)
-    data = source[i:i+seq_len]
-    target = source[i+1:i+1+seq_len]
+    data = source[i : i + seq_len]
+    target = source[i + 1 : i + 1 + seq_len]
     return data, target
 
 
@@ -32,27 +32,29 @@ def create_exp_dir(path, scripts_to_save=None):
     if not os.path.exists(path):
         os.mkdir(path)
 
-    print('Experiment dir : {}'.format(path))
+    print("Experiment dir : {}".format(path))
     if scripts_to_save is not None:
-        os.mkdir(os.path.join(path, 'scripts'))
+        os.mkdir(os.path.join(path, "scripts"))
         for script in scripts_to_save:
-            dst_file = os.path.join(path, 'scripts', os.path.basename(script))
+            dst_file = os.path.join(path, "scripts", os.path.basename(script))
             shutil.copyfile(script, dst_file)
 
 
 def save_checkpoint(model, optimizer, epoch, path, finetune=False):
     if finetune:
-        torch.save(model, os.path.join(path, 'finetune_model.pt'))
-        torch.save(optimizer.state_dict(), os.path.join(path, 'finetune_optimizer.pt'))
+        torch.save(model, os.path.join(path, "finetune_model.pt"))
+        torch.save(optimizer.state_dict(), os.path.join(path, "finetune_optimizer.pt"))
     else:
-        torch.save(model, os.path.join(path, 'model.pt'))
-        torch.save(optimizer.state_dict(), os.path.join(path, 'optimizer.pt'))
-    torch.save({'epoch': epoch+1}, os.path.join(path, 'misc.pt'))
+        torch.save(model, os.path.join(path, "model.pt"))
+        torch.save(optimizer.state_dict(), os.path.join(path, "optimizer.pt"))
+    torch.save({"epoch": epoch + 1}, os.path.join(path, "misc.pt"))
 
 
 def embedded_dropout(embed, words, dropout=0.1, scale=None):
     if dropout:
-        mask = embed.weight.new().resize_((embed.weight.size(0), 1)).bernoulli_(1 - dropout).expand_as(embed.weight) / (1 - dropout)
+        mask = embed.weight.new().resize_((embed.weight.size(0), 1)).bernoulli_(
+            1 - dropout
+        ).expand_as(embed.weight) / (1 - dropout)
         masked_embed_weight = mask * embed.weight
     else:
         masked_embed_weight = embed.weight
@@ -62,9 +64,14 @@ def embedded_dropout(embed, words, dropout=0.1, scale=None):
     padding_idx = embed.padding_idx
     if padding_idx is None:
         padding_idx = -1
-    X = embed._backend.Embedding.apply(words, masked_embed_weight,
-        padding_idx, embed.max_norm, embed.norm_type,
-        embed.scale_grad_by_freq, embed.sparse
+    X = embed._backend.Embedding.apply(
+        words,
+        masked_embed_weight,
+        padding_idx,
+        embed.max_norm,
+        embed.norm_type,
+        embed.scale_grad_by_freq,
+        embed.sparse,
     )
     return X
 

@@ -35,6 +35,8 @@ OPS = {
 
 
 class ReLUConvBN(nn.Module):
+    """The ReLU-Convolution-BatchNorm paradigm."""
+
     def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
         super(ReLUConvBN, self).__init__()
         self.op = nn.Sequential(
@@ -50,6 +52,8 @@ class ReLUConvBN(nn.Module):
 
 
 class DilConv(nn.Module):
+    """Dilated Convolution with specifiable dilation."""
+
     def __init__(
         self, C_in, C_out, kernel_size, stride, padding, dilation, affine=True
     ):
@@ -75,6 +79,8 @@ class DilConv(nn.Module):
 
 
 class SepConv(nn.Module):
+    """Point-wise Separable Convolution."""
+
     def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
         super(SepConv, self).__init__()
         self.op = nn.Sequential(
@@ -109,6 +115,8 @@ class SepConv(nn.Module):
 
 
 class Identity(nn.Module):
+    """Simply forwards its input."""
+
     def __init__(self):
         super(Identity, self).__init__()
 
@@ -117,6 +125,8 @@ class Identity(nn.Module):
 
 
 class Zero(nn.Module):
+    """The paper's 'zero' operation. This is simply a missing link between cells, i.e. multiplication by zero."""
+    
     def __init__(self, stride):
         super(Zero, self).__init__()
         self.stride = stride
@@ -124,7 +134,7 @@ class Zero(nn.Module):
     def forward(self, x):
         if self.stride == 1:
             return x.mul(0.0)
-        return x[:, :, :: self.stride, :: self.stride].mul(0.0)
+        return x[:, :, ::self.stride, ::self.stride].mul(0.0)
 
 
 class FactorizedReduce(nn.Module):
