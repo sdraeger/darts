@@ -154,8 +154,8 @@ class Network(nn.Module):
         self.alphas_normal = 1e-3 * torch.randn(k, num_ops, device=device)
         self.alphas_reduce = 1e-3 * torch.randn(k, num_ops, device=device)
 
-        self.alphas_normal.requires_grad_(True)
-        self.alphas_reduce.requires_grad_(True)
+        self.alphas_normal.requires_grad_()
+        self.alphas_reduce.requires_grad_()
 
         self._arch_parameters = [self.alphas_normal, self.alphas_reduce]
 
